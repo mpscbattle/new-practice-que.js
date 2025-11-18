@@ -1,194 +1,145 @@
-// ------------------- JAVASCRIPT START -------------------
-const quizDiv = document.getElementById("quiz");
-const timerDiv = document.getElementById("timer");
-const submitBtn = document.getElementById("submitBtn");
-const resetBtn = document.getElementById("resetBtn");
-const reportCard = document.getElementById("reportCard");
-const analysisCard = document.getElementById("analysisCard");
-const viewAnalysisBtn = document.getElementById("viewAnalysisBtn");
+document.addEventListener('DOMContentLoaded', function () {
+    const questionCards = document.querySelectorAll('.question-card');
+    const submitTestBtn = document.getElementById('submitTestBtn');
+    const resultsCard = document.getElementById('resultsCard');
+    const tryAgainBtn = document.getElementById('tryAgainBtn');
+    const nextSetBtn = document.getElementById('nextSetBtn');
+    const selectedAnswers = {};
 
-const initialStartScreen = document.getElementById("initialStartScreen");
-const centerStartBtn = document.getElementById("centerStartBtn");
-const quizBox = document.getElementById("quizBox");
-const questionCountDisplay = document.getElementById('questionCountDisplay');
-const progressBar = document.getElementById('progressBar'); 
-
-let selectedAnswers = [], quizLocked = [], correctCount = 0;
-let timer = 1500, timerStarted = false, timerInterval; 
-
-const questions = [];
-document.querySelectorAll(".question-data").forEach(qEl => {
-  const q = qEl.querySelector(".q").innerText;
-  const opts = Array.from(qEl.querySelectorAll(".opt")).map(el => el.innerText);
-  const ans = parseInt(qEl.getAttribute("data-answer"));
-  const explanation = qEl.getAttribute("data-explanation") || "";
-  questions.push({ question: q, options: opts, answer : ans, explanation: explanation });
-});
-
-const qCountInitialEl = document.getElementById('qCountInitial');
-if (qCountInitialEl) {
-    qCountInitialEl.textContent = questions.length;
-}
-
-function renderAllQuestions() {
-  let html = "";
-  let attemptedCount = 0;
-  
-  questions.forEach((q, index) => {
-    if (selectedAnswers[index] !== undefined) {
-        attemptedCount++;
+    function scrollToFirstQuestion() {
+        if (questionCards.length > 0) {
+            questionCards[0].scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
     }
 
-    html += `<div class="question-card">
-      <div class="question-number-circle">${index + 1}</div>
-      <div class="question">${q.question}</div>
-      <div class="options">`;
-    q.options.forEach((opt, i) => {
-      const isSelected = selectedAnswers[index] === i ? " selected" : "";
-      const onClickAttr = quizLocked[index] ? '' : `onclick='selectAnswer(${index}, ${i})'`;
-      html += `<div class='option${isSelected}' ${onClickAttr}>${opt}</div>`;
+    questionCards.forEach((card, cardIndex) => {
+        const viewAnswerBtn = card.querySelector('.view-answer-btn');
+        const options = card.querySelectorAll('.option');
+        const correctAnswerIndex = parseInt(card.dataset.correctAnswer);
+
+        options.forEach(option => {
+            option.addEventListener('click', function () {
+                // Remove selected class from all options in this card
+                options.forEach(opt => opt.classList.remove('selected', 'correct', 'wrong'));
+                // Add selected class to the clicked option
+                this.classList.add('selected');
+                // Store the selected answer index
+                selectedAnswers[cardIndex] = parseInt(this.dataset.optionIndex);
+            });
+        });
+
+        if (viewAnswerBtn) {
+            viewAnswerBtn.addEventListener('click', function () {
+                const explanationBox = card.querySelector('.explanation-box');
+                if (explanationBox) explanationBox.style.display = 'block';
+                this.style.display = 'none'; // Hide View Answer button
+
+                options.forEach(option => {
+                    const optionIndex = parseInt(option.dataset.optionIndex);
+                    option.classList.remove('selected');
+                    
+                    if (optionIndex === correctAnswerIndex) {
+                        option.classList.add('correct');
+                    } else if (selectedAnswers[cardIndex] === optionIndex) {
+                        option.classList.add('wrong');
+                    }
+                    option.style.pointerEvents = 'none'; // Lock options after viewing answer
+                });
+            });
+        }
     });
-    html += `</div></div>`;
-  });
-  quizDiv.innerHTML = html;
 
-  const totalQuestions = questions.length;
-  
-  if (questionCountDisplay) {
-      questionCountDisplay.textContent = `Attempted: ${attemptedCount}/${totalQuestions}`;
-  }
-  
-  if (progressBar) {
-      const progressPercent = (attemptedCount / totalQuestions) * 100;
-      progressBar.style.width = `${progressPercent}%`;
-  }
-}
+    if (submitTestBtn) {
+        submitTestBtn.addEventListener('click', function () {
+            let totalQuestions = questionCards.length;
+            let attemptedQuestions = 0;
+            let correctAnswers = 0;
+            let wrongAnswers = 0;
 
-function selectAnswer(qIndex, aIndex) {
-  if (quizLocked[qIndex]) return;
-  selectedAnswers[qIndex] = aIndex;
-  renderAllQuestions(); 
-}
+            questionCards.forEach((card, cardIndex) => {
+                const correctAnswerIndex = parseInt(card.dataset.correctAnswer);
+                const userAnswerIndex = selectedAnswers[cardIndex];
+                const options = card.querySelectorAll('.option');
 
-function updateTimer() {
-  let min = Math.floor(timer / 60);
-  let sec = timer % 60;
-  timerDiv.textContent = `🕛 ${min}:${sec < 10 ? '0' + sec : sec}`;
-  timer--;
-  if (timer < 0) {
-    clearInterval(timerInterval);
-    submitResults();
-  }
-}
+                // 1. Calculate Score
+                if (userAnswerIndex !== undefined) {
+                    attemptedQuestions++;
+                    if (userAnswerIndex === correctAnswerIndex) {
+                        correctAnswers++;
+                    } else {
+                        wrongAnswers++;
+                    }
+                }
 
-function submitResults() {
-  clearInterval(timerInterval);
+                // 2. Apply Visual Feedback
+                options.forEach(option => {
+                    const optionIndex = parseInt(option.dataset.optionIndex);
+                    option.style.pointerEvents = 'none'; // Lock all options
+                    option.classList.remove('selected', 'correct', 'wrong');
+                    
+                    if (optionIndex === correctAnswerIndex) {
+                        option.classList.add('correct'); // Mark correct answer
+                    } else if (userAnswerIndex === optionIndex) {
+                        option.classList.add('wrong'); // Mark wrong selection
+                    }
+                });
 
-  quizLocked = questions.map(() => true);
-  renderAllQuestions(); 
+                // 3. Show Answer/Explanation Boxes
+                const viewAnsBtn = card.querySelector('.view-answer-btn');
+                if (viewAnsBtn) viewAnsBtn.style.display = 'none';
 
-  submitBtn.style.display = 'none';
-  resetBtn.style.display = 'none';
+                const explanationBox = card.querySelector('.explanation-box');
+                if (explanationBox) explanationBox.style.display = 'block';
+            });
 
-  quizBox.style.display = 'block'; 
-  reportCard.style.display = 'block';
-  analysisCard.style.display = 'none';
-  
-  if (progressBar) {
-      progressBar.style.width = '100%';
-  }
+            // 4. Update Results Card
+            document.getElementById('totalQuestions').textContent = totalQuestions;
+            document.getElementById('attemptedQuestions').textContent = attemptedQuestions;
+            document.getElementById('correctAnswers').textContent = correctAnswers;
+            document.getElementById('wrongAnswers').textContent = wrongAnswers;
+            document.getElementById('yourScore').textContent = correctAnswers;
+            document.getElementById('maxScore').textContent = totalQuestions;
 
-  let attempted = selectedAnswers.filter(v => v !== undefined).length;
-  correctCount = selectedAnswers.filter((v, i) => v === questions[i].answer).length;
+            let message = '';
+            if (totalQuestions > 0 && correctAnswers === totalQuestions) {
+                message = "Excellent All Answers Are Correct";
+            } else if (correctAnswers === 0 && attemptedQuestions === 0) {
+                message = "You Haven't Attempted Any Questions Yet";
+            } else if (correctAnswers >= totalQuestions / 2) {
+                message = "Good Job Keep Practicing";
+            } else {
+                message = "Keep Practicing To Improve";
+            }
+            document.getElementById('resultsMessage').textContent = message;
 
-  document.getElementById("total").textContent = questions.length;
-  document.getElementById("attempted").textContent = attempted;
-  document.getElementById("correct").textContent = correctCount;
-  document.getElementById("wrong").textContent = attempted - correctCount;
-  document.getElementById("score").textContent = correctCount;
-  document.getElementById("totalScore").textContent = questions.length;
-
-  const percent = ((correctCount / questions.length) * 100).toFixed(2);
-  document.getElementById("percentage").textContent = percent;
-
-  const msg = percent >= 80 ? "Excellent Work" : percent >= 50 ? "Good Job" : "Keep Practicing";
-  document.getElementById("resultMessage").textContent = msg;
-  
-  setTimeout(() => reportCard.scrollIntoView({ behavior: "smooth" }), 300);
-}
-
-function showAnalysis() {
-  reportCard.style.display = 'block'; 
-  analysisCard.style.display = 'block';
-  
-  const container = document.getElementById("analysisContent");
-  container.innerHTML = "";
-
-  questions.forEach((q, i) => {
-    const userAnswer = selectedAnswers[i];
-    let feedback = "Question Not Attempted", feedbackClass = "not-attempted-feedback";
-
-    if (userAnswer !== undefined) {
-      const isCorrect = userAnswer === q.answer;
-      feedback = isCorrect ? "Your Ans is Correct" : "Your Ans is Wrong";
-      feedbackClass = isCorrect ? "correct-feedback" : "wrong-feedback";
+            // 5. Display and Scroll to Results
+            resultsCard.style.display = 'block';
+            submitTestBtn.style.display = 'none';
+            if (resultsCard) {
+                resultsCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        });
     }
 
-    let html = `<div class='analysis-box'>
-      <div class="question-number-circle">${i + 1}</div>
-      <div><b>${q.question}</b></div>`;
-    
-    q.options.forEach((opt, j) => {
-      let cls = "option";
-      if (j === q.answer) cls += " correct";
-      if (j === userAnswer && j !== q.answer) cls += " wrong"; 
-      
-      html += `<div class='${cls}' style='margin: 5px 0;'>${opt}</div>`;
-    });
-    
-    html += `<div class='feedback ${feedbackClass}'>${feedback}</div>`;
-
-    if (q.explanation) {
-      html += `<div class='explanation-box'><b>Explanation:</b> ${q.explanation}</div>`;
+    if (tryAgainBtn) {
+        tryAgainBtn.addEventListener('click', function () {
+            location.reload(); // Reload the page to reset the quiz
+            // Optional: Scroll to the top after reload (though reload usually resets scroll position)
+            setTimeout(scrollToFirstQuestion, 100); 
+        });
     }
 
-    container.innerHTML += html;
-  });
-
-  setTimeout(() => analysisCard.scrollIntoView({ behavior: "smooth" }), 300);
-}
-
-// --- Event Listeners ---
-document.addEventListener("DOMContentLoaded", () => {
-  renderAllQuestions();
-  updateTimer();
-  timer++; 
-  
-  initialStartScreen.style.display = 'block';
-  quizBox.style.display = 'none';
-
-  initialStartScreen.style.marginTop = '20px'; 
-  
-  if (questionCountDisplay) {
-    questionCountDisplay.textContent = `Attempted: 0/${questions.length}`;
-  }
+    // Next Question Set Button Logic - Reads URL from HTML data attribute
+    if (nextSetBtn) {
+        nextSetBtn.addEventListener('click', function () {
+            // Read the URL from the data-next-url attribute in the HTML button
+            const NEXT_TEST_URL = this.getAttribute('data-next-url'); 
+            
+            if (NEXT_TEST_URL && NEXT_TEST_URL !== "https://yourwebsite.com/set-02/test.html") {
+                 window.location.href = NEXT_TEST_URL; // Navigate to the next URL
+            } else {
+                 alert("कृपया Next Test URL को कॉन्फ़िगर करें (HTML में data-next-url एट्रीब्यूट को बदलें)!");
+            }
+        });
+    }
 });
-
-// Start Quiz Button handler
-centerStartBtn.onclick = () => {
-    if (!timerStarted) {
-        initialStartScreen.style.display = 'none';
-        quizBox.style.display = 'block';
-        timerInterval = setInterval(updateTimer, 1000);
-        timerStarted = true;
-        renderAllQuestions(); 
-        quizBox.scrollIntoView({ behavior: "smooth", block: "start" }); // Scroll to top on start
-    }
-};
-
-submitBtn.onclick = submitResults;
-resetBtn.onclick = () => location.reload(); 
-viewAnalysisBtn.onclick = showAnalysis;
-
-window.selectAnswer = selectAnswer;
-// ------------------- JAVASCRIPT END -------------------
